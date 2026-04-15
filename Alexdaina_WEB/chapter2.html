@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scrolling Gallery</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Eagle+Lake&family=Lancelot&display=swap" rel="stylesheet">
+<style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: #0a0a0a;
+      font-family: 'Josefin Sans', sans-serif;
+    }
+
+    /* ── Each section fills the viewport ── */
+    .page {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Background image ── */
+    .page__bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transform: scale(1.03); /* tiny scale prevents white edge flash */
+      transition: transform 0.6s ease;
+      filter: blur(1px) brightness(0.6);
+    }
+
+    /* ── Top & bottom opacity fade using a gradient overlay ── */
+    .page__fade {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255, 0.75) 0%,
+        rgba(255,255,255, 0.10) 22%,
+        rgba(255,255,255, 0.00) 38%,
+        rgba(255,255,255, 0.00) 62%,
+        rgba(255,255,255, 0.10) 78%,
+        rgba(255,255,255, 0.75) 100%
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Text label ── */
+    .page__label {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      color: yellow;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .page__label.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .title_box {
+      
+font-family: "Lancelot", serif;
+font-weight: bold;
+font-style: normal;
+      font-size: clamp(4.5rem, 10vw, 9rem);
+      font-weight: 300;
+      line-height: 0.7;
+      letter-spacing: -0.02em;
+      color: #870000c2;
+      text-shadow: 0 2px 40px rgba(255, 9, 9, 0.852);
+      width: 40vw;  
+      -webkit-text-stroke: 1px rgb(255, 170, 0);
+    }
+
+    .page__word {
+      font-family: 'Josefin Sans', sans-serif;
+      font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+      font-weight: 100;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* ── Thin rule decorations ── */
+    .page__rule {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      margin-top: 0.4rem;
+    }
+
+    .page__rule span {
+      display: block;
+      width: 40px;
+      height: 1px;
+      background: rgba(255,255,255,0.45);
+    }
+
+    .page__rule em {
+      font-style: normal;
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+    }
+
+    /* ── Scroll hint on first page only ── */
+    .scroll-hint {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgb(255, 170, 0);
+      font-size: 0.6rem;
+      font-family: 'Times New Roman', Times, serif;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    .scroll-hint svg {
+      width: 18px;
+      opacity: 0.5;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%       { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* ── Slim progress bar ── */
+    #progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: rgba(255,255,255,0.6);
+      width: 0%;
+      z-index: 100;
+      transition: width 0.1s linear;
+    }
+
+    /* ── Page indicator dots ── */
+    #dots {
+      position: fixed;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #870000c2;
+      border: 1px solid rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: background 0.3s, transform 0.3s;
+    }
+
+    .dot.active {
+      background: rgb(255, 170, 0);
+      transform: scale(1.4);
+    }
+
+    div.corner-top-left{
+  position:fixed;
+  top:0;
+  left:0;
+  height: 10%;
+  width: 10%;
+  z-index: 7;
+}
+
+div.corner-bottom-right{
+  position: fixed;
+  bottom: 90vh;
+  right: 90vw;
+
+  height: 10%;
+  width: 10%;
+  z-index: 7;
+}
+
+.frame{
+  height: 1000%;
+  width: 1000%;
+}
+
+.text-box{
+    padding: 5px;
+    width: 50vw;
+    font-family: 'Times New Roman', Times, serif;
+    text-align: center;
+    justify-content: center;
+    text-shadow: 0 0 10px rgba(255, 230, 100, 0.6);
+}
+
+    /* ── Image sources (local folder) ── */
+    #page-0 .page__bg { background-image: url('content/paris.jpg'); }
+    #page-1 .page__bg { background-image: url('content/subw.jpg'); }
+    #page-2 .page__bg { background-image: url('content/field.jpg'); }
+    #page-3 .page__bg { background-image: url('content/trans.jpg'); }
+    #page-4 .page__bg { background-image: url('content/casr.jpg'); }
+
+    @media (max-width: 768px) {
+      .text-box {
+        width: 90vw; /* Much wider on mobile for readability */
+      }
+      .title_box {
+        width: 90vw; /* Keeps the title correctly proportioned on small screens too */
+      }
+    } 
+
+    .back-btn {
+      position: absolute;
+      top: 2rem;
+      right: 2rem;
+      z-index: 10;
+      padding: 0.6rem 1.2rem;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(111, 4, 4, 0.8);
+      color: rgba(111, 4, 4, 0.8);
+      text-decoration: none;
+      font-size: 0.75rem;
+      font-family: 'Times New Roman', Times, serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: background 0.3s ease, color 0.3s ease;
+      border-radius: 4px;
+    }
+
+    .back-btn:hover {
+      background: rgb(255, 170, 0);
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <nav id="dots">
+    <div class="dot active" data-idx="0"></div>
+    <div class="dot" data-idx="1"></div>
+    <div class="dot" data-idx="2"></div>
+    <div class="dot" data-idx="3"></div>
+    <div class="dot" data-idx="4"></div>
+  </nav>
+
+  <div class="corner-top-left">
+    <img class="frame" src="content/frame2.png" >
+</div>
+
+<div class="corner-bottom-right">
+    <img class="frame" src="content/frame.png">
+</div>
+  <!-- 7 pages -->
+  <section class="page" id="page-0">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <a href="menu.html" class="back-btn">Menu</a>
+    <div class="page__label">
+      <p class="title_box">The Train as Suspension </p>
+    </div>
+    <div class="scroll-hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 5v14M5 12l7 7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Scroll
+    </div>
+  </section>
+
+  <section class="page" id="page-1">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+        <p class="text-box">The journey to the castle begins by train.
+            </p>
+            <p class="text-box">The train is neither city nor countryside.</br>
+            It is a space in-between, a suspension where belonging temporarily dissolves.</p>
+            <p class="text-box">Tristan sits opposite the psychologist in a quiet carriage as Paris dissolves into industrial edges,
+              then fields, then long horizontal stretches that seem to extend without interruption, flattening the
+              world into distance.</p>
+            <p class="text-box">The psychologist speaks in calm intervals, outlining a method.</p>
+            <p class="text-box">Isolation, he explains, can reduce external triggers.</br> Routine will be implemented. </br>Sessions will
+              be maintained.</p>
+            <p class="text-box">The authority feels reassuring.</p>
+            <p class="text-box">There is structure in this transfer, a sense that something is being guided, contained, and
+              observed from the outside.</p>
+            <p class="text-box">For the first time in weeks, Tristan feels accompanied without being scrutinized. The presence of
+              the psychologist absorbs part of the doubling, softening the split between the one who lives and
+              the one who observes.</p>
+              <p class="text-box">They pass through tunnels.</p>
+              <p class="text-box">For a few seconds at a time, reflection replaces landscape in the window glass.
+                Tristan sees himself layered over darkness.</p>
+              <p class="text-box">He notices it immediately.</br>
+                And this time, he decides to look away.</p>
+                <p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+    </div>
+    
+  </section>
+
+  <section class="page" id="page-2">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+      <p class="text-box">Outside, the countryside unfolds in wide, uninterrupted planes. </br>Villages appear briefly and
+        disappear again, leaving behind stretches of emptiness that feel increasingly uniform.</p>
+      <p class="text-box">He feels something shift.
+        Not relief.</p>
+      <p class="text-box">But thinning.</p>
+      <p class="text-box">In Paris, hyper-awareness was constantly activated and shaped by others, by reactions, by subtle
+        feedback loops that forced him to adjust, even if uncomfortably.</br> That constant external reference,
+        though exhausting, provided a form of orientation.</p>
+      <p class="text-box">Here, that vigilance disappears.</p>
+      <p class="text-box"> No one looks at him. No one responds.</p>
+      <p class="text-box"> The horizon stretches too far.
+          The silence between places expands.</p>
+
+          <p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+    </div>
+  </section>
+
+  <section class="page" id="page-3">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+      <p class="text-box">Without realizing it, Tristan begins paying attention differently.</p>
+      <p class="text-box">The rhythm of the train on the tracks becomes more present, repetitive, almost hypnotic.
+        A faint electrical hum runs above.</p>
+      <p class="text-box">The seat vibrates subtly beneath him, transmitting movement directly into his body.</p>
+      <p class="text-box">His awareness spreads into the quiet space.</p>
+      <p class="text-box">He asks:</p>
+      <p class="text-box">“What happens if the silence becomes louder?”</p>
+      <p class="text-box">The psychologist responds:</p>
+      <p class="text-box">“Then we observe it.”</p>
+      <p class="text-box">Observe.</p>
+      <p class="text-box"> The word stabilizes him, because here observation is positioned as external and structured,
+      guided by another, unlike hyper-awareness, which trapped him inside his own continuous self-
+      monitoring without distance.</p>
+      <p class="text-box">There will be supervision: regular conversations, structured check-ins, a presence that remains
+        external.</p>
+        <p class="text-box">There will be documentation: written records, traces of what is happening.
+        </br>There will be someone measuring what he cannot measure himself.</p>
+        <p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+    </div>
+  </section>
+
+  <section class="page" id="page-4">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+        <p class="text-box">The train slows.</p>
+        <p class="text-box">The station is nearly empty, a small rural platform that feels disproportionately large in its
+          silence.</br> Night has already settled.</p>
+        <p class="text-box">A single overhead lamp casts a narrow circle of light.</br> They step onto the platform.</p>
+        <p class="text-box">A butler waits beside an old car.</p>
+        <p class="text-box">Gravel shifts beneath their steps as they approach. </br>The road curves upward through dark trees,
+          branches moving slowly in the wind.</p>
+        <p class="text-box">The castle appears gradually.</p>
+        <p class="text-box">Not imposing.
+          Contained.</p>
+        <p class="text-box">Stone absorbs light rather than reflecting it.</br> Most windows remain dark.</p>
+        <p class="text-box">In the distance, a church bell marks the hour.
+        </br>The sound lingers slightly longer than expected.</p>
+        <p class="text-box">The car stops.</p>
+        <p class="text-box">The psychologist exits first and walks ahead without hesitation.
+        </br> Authority precedes him.</p>
+          <p class="text-box">For a brief moment, Tristan feels safe.</p>
+          <p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+    </div>
+  </section>
+
+  
+
+  <script>
+    const pages  = document.querySelectorAll('.page');
+    const labels = document.querySelectorAll('.page__label');
+    const dots   = document.querySelectorAll('.dot');
+    const bar    = document.getElementById('progress');
+
+    // ── IntersectionObserver: reveal label when page enters viewport ──
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const idx = [...pages].indexOf(entry.target);
+        const label = labels[idx];
+        if (entry.isIntersecting) {
+          label.classList.add('visible');
+          dots.forEach(d => d.classList.remove('active'));
+          if (dots[idx]) dots[idx].classList.add('active');
+        } else {
+          label.classList.remove('visible');
+        }
+      });
+    }, { threshold: 0.5 });
+
+    pages.forEach(p => observer.observe(p));
+
+    // ── Scroll progress bar ──
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // ── Dot navigation ──
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        const idx = parseInt(dot.dataset.idx);
+        pages[idx].scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>

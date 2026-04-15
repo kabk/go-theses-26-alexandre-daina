@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scrolling Gallery</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Eagle+Lake&family=Lancelot&display=swap" rel="stylesheet">
+<style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: #0a0a0a;
+      font-family: 'Josefin Sans', sans-serif;
+    }
+
+    /* ── Each section fills the viewport ── */
+    .page {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Background image ── */
+    .page__bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transform: scale(1.03); /* tiny scale prevents white edge flash */
+      transition: transform 0.6s ease;
+      filter: blur(1px) brightness(0.6);
+    }
+
+
+    /* ── Top & bottom opacity fade using a gradient overlay ── */
+    .page__fade {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255, 0.75) 0%,
+        rgba(255,255,255, 0.10) 22%,
+        rgba(255,255,255, 0.00) 38%,
+        rgba(255,255,255, 0.00) 62%,
+        rgba(255,255,255, 0.10) 78%,
+        rgba(255,255,255, 0.75) 100%
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Text label ── */
+    .page__label {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      color: yellow;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .page__label.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .title_box {
+      
+font-family: "Lancelot", serif;
+font-weight: bold;
+font-style: normal;
+      font-size: clamp(4.5rem, 10vw, 9rem);
+      font-weight: 300;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      text-shadow: 0 2px 40px rgba(0,0,0,0.6);
+
+      color: #870000c2;
+      text-shadow: 0 2px 40px rgba(255, 9, 9, 0.852);
+      width: 50vw;  
+      -webkit-text-stroke: 1px rgb(255, 170, 0); 
+    }
+
+    .page__word {
+      font-family: 'Josefin Sans', sans-serif;
+      font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+      font-weight: 100;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* ── Thin rule decorations ── */
+    .page__rule {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      margin-top: 0.4rem;
+    }
+
+    .page__rule span {
+      display: block;
+      width: 40px;
+      height: 1px;
+      background: rgba(255,255,255,0.45);
+    }
+
+    .page__rule em {
+      font-style: normal;
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+    }
+
+    /* ── Scroll hint on first page only ── */
+    .scroll-hint {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgb(255, 170, 0);
+      font-size: 0.6rem;
+      font-family: 'Times New Roman', Times, serif;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    .scroll-hint svg {
+      width: 18px;
+      opacity: 0.5;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%       { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* ── Slim progress bar ── */
+    #progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: rgba(255,255,255,0.6);
+      width: 0%;
+      z-index: 100;
+      transition: width 0.1s linear;
+    }
+
+    /* ── Page indicator dots ── */
+    #dots {
+      position: fixed;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #870000c2;
+      border: 1px solid rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: background 0.3s, transform 0.3s;
+    }
+
+    .dot.active {
+      background: rgb(255, 170, 0);
+      transform: scale(1.4);
+    }
+
+    div.corner-top-left{
+  position:fixed;
+  top:0;
+  left:0;
+  height: 10%;
+  width: 10%;
+  z-index: 7;
+}
+
+div.corner-bottom-right{
+  position: fixed;
+  bottom: 90vh;
+  right: 90vw;
+
+  height: 10%;
+  width: 10%;
+  z-index: 7;
+}
+
+.frame{
+  height: 1000%;
+  width: 1000%;
+}
+
+.text-box{
+    padding: 5px;
+    width: 50vw;
+    font-family: 'Times New Roman', Times, serif;
+    text-align: center;
+    justify-content: center;
+    text-shadow: 0 0 10px rgba(255, 230, 100, 0.6);
+}
+
+
+    /* ── Image sources (local folder) ── */
+    #page-0 .page__bg { background-image: url('content/cast.jpg'); }
+    #page-1 .page__bg { background-image: url('content/doc.jpg'); }
+    #page-2 .page__bg { background-image: url('content/peri.jpg'); }
+    #page-3 .page__bg { background-image: url('content/corri.jpg'); }
+    #page-4 .page__bg { background-image: url('content/ey.jpg'); }
+    #page-5 .page__bg { background-image: url('content/halu.jpg'); }
+    #page-6 .page__bg { background-image: url('content/hallu.jpg'); }
+    #page-7 .page__bg { background-image: url('content/tower.jpg'); }
+    #page-8 .page__bg { background-image: url('content/deaf.jpg'); }
+
+    @media (max-width: 768px) {
+      .text-box {
+        width: 90vw; /* Much wider on mobile for readability */
+      }
+      .title_box {
+        width: 90vw; /* Keeps the title correctly proportioned on small screens too */
+      }
+    } 
+    .back-btn {
+      position: absolute;
+      top: 2rem;
+      right: 2rem;
+      z-index: 10;
+      padding: 0.6rem 1.2rem;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(111, 4, 4, 0.8);
+      color: rgba(111, 4, 4, 0.8);
+      text-decoration: none;
+      font-size: 0.75rem;
+      font-family: 'Times New Roman', Times, serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: background 0.3s ease, color 0.3s ease;
+      border-radius: 4px;
+    }
+
+    .back-btn:hover {
+      background: rgb(255, 170, 0);
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <nav id="dots">
+    <div class="dot active" data-idx="0"></div>
+    <div class="dot" data-idx="1"></div>
+    <div class="dot" data-idx="2"></div>
+    <div class="dot" data-idx="3"></div>
+    <div class="dot" data-idx="4"></div>
+    <div class="dot" data-idx="5"></div>
+    <div class="dot" data-idx="6"></div>
+    <div class="dot" data-idx="7"></div>
+    <div class="dot" data-idx="8"></div>
+  </nav>
+
+  <div class="corner-top-left">
+    <img class="frame" src="content/frame2.png" >
+</div>
+
+<div class="corner-bottom-right">
+    <img class="frame" src="content/frame.png">
+</div>
+  <!-- 7 pages -->
+  <section class="page" id="page-0">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <a href="menu.html" class="back-btn">Menu</a>
+    <div class="page__label">
+      <p class="title_box">When Perception Devours Its Anchor    </p>
+    </div>
+    <div class="scroll-hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 5v14M5 12l7 7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Scroll
+    </div>
+  </section>
+
+  <section class="page" id="page-1">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+        <p class="text-box">The door opens.<br>
+            The castle does not threaten.</p>
+        <p class="text-box">It receives.</p>
+        <p class="text-box">The first nights are quiet in a way that feels medicinal, not empty, but contained, as if sound itself
+            has been filtered, slowed down, and redistributed across the thickness of the walls. </br>There are no
+            sirens, no overlapping voices, no reflections multiplying his image from every surface.</p>
+        <p class="text-box">Only stone, and sounds that arrive softened, delayed, and contained, as if filtered through the
+            thickness of the walls.</p>
+        <p class="text-box">Footsteps travel through corridors and return a fraction of a second later, slightly displaced, as if
+            the space is responding rather than simply reflecting. </br>Doors close with a muted heaviness that
+            seems to linger in the air longer than expected, and the wind, moving along the outer walls,
+            produces a continuous low presence that never fully disappears, like a background layer that
+            cannot be switched off.</p>
+        <p class="text-box">Days begin to take shape through repetition.</p>
+        <p class="text-box">Not imposed abruptly, but installed gradually, until they appear natural.</p>
+        <p class="text-box">The psychologist interviews him.</p>
+        <p class="text-box">Interviews occur in a fixed room, always at the same time, where the psychologist asks Tristan to
+          describe what he notices, not only what he feels, but how he perceives, how long things last, how
+          space behaves around him.</br> The questions are simple, but they insist on detail.</p>
+          <p class="text-box">Notes are taken.</p>
+          <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+
+    </div>
+    
+  </section>
+
+  <section class="page" id="page-2">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+        <p class="text-box">The routine feels stable.</p>
+        <p class="text-box">Day 2:<br>Tristan walks around the perimeter of the castle.</br> Rooms are explained. </br>The logic of the
+            space is introduced, not as architecture, but as something to inhabit and observe.</p>
+        <p class="text-box">Morning walks along the wall, where the landscape extends without interruption.
+        </br>Reading in the south chamber, where light enters at a precise angle and remains constant.
+    </br> Meals at fixed hours, always in the same room.</p>
+        <p class="text-box">Evening silence.</p>
+        <p class="text-box">At first, the silence feels restorative, a space where nothing demands him, where no one is
+            watching, where his attention no longer needs to anticipate interruption.</p>
+        <p class="text-box">But gradually, that absence begins to shift.
+        Silence does not remain empty.</p>
+        <p class="text-box">It becomes resonant.</p>
+        <p class="text-box">Without external interaction, perception does not diminish; it redirects, folding inward,
+            expanding into areas that previously remained unnoticed. </br>There are no external gazes to
+            anticipate, no reactions to adjust to, no unpredictable interruptions forcing him outward.</p>
+        <p class="text-box">So he begins anticipating himself.</p>
+        <p class="text-box">He notices how his footsteps echo, not only that they echo, but how long the echo lasts, how it
+              changes depending on the corridor,</br> how it slightly delays, as if it hesitates before returning.</p>
+              <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            
+  
+       
+    </div>
+  </section>
+
+  <section class="page" id="page-3">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+
+      <p class="text-box">He repeats the same walk at different times of day.</p>
+        <p class="text-box">He compares.</br>
+              He listens.</p>
+        <p class="text-box">He times the church bell in the village below.
+            Precise intervals.</p>
+     <p class="text-box">The regularity becomes reassuring.</p>
+    <p class="text-box">Then absorbing, not just reassuring through its regularity, but beginning to occupy his attention
+        completely, drawing him into its precision and demanding to be tracked, measured, and understood.
+    </br>He wonders who maintains it, who ensures its consistency, whether someone is there or whether
+        it continues independently.</p>
+    <p class="text-box">Small observations accumulate, and what begins as attention slowly becomes a system of measurement.</p>
+    <p class="text-box">He starts mapping space through duration.</p>
+    <p class="text-box">How long it takes to cross a corridor.</br>
+        How many steps from one door to another.</br>
+        How sound shifts between rooms, sometimes absorbed, sometimes amplified.</br>
+        How shadows move across the walls during the afternoon, not randomly, but following a pattern
+        that feels almost intentional.</p>
+    <p class="text-box">
+        The interviews become less frequent.</br>
+        Then they stop.</br>
+     The absence is not announced.</p>
+     <p class="text-box">It simply occurs.</p>
+     <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+        
+        
+    </div>
+  </section>
+
+  <section class="page" id="page-4">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+        <p class="text-box">Instead, written notes begin appearing beneath his door.</br>
+            Continue observation.</br>
+            Reduce village contact.</p>
+        <p class="text-box">The phrasing remains familiar, but something in the tone has shifted, less conversational, more
+            directive.</p>
+        <p class="text-box">The handwriting is similar.</br>
+            But more vertical.</br>
+            More controlled.</p>
+        <p class="text-box">He assumes fatigue, or a shift toward efficiency,</br> a more controlled and impersonal way of
+            maintaining the process.</p>
+        <p class="text-box">But the difference persists.</p>
+        <p class="text-box">He begins noticing that report entries describe emotional states before he consciously
+            experiences them, as if the writing precedes the feeling rather than records it.</p>
+        <p class="text-box">Moments appear documented that he does not remember describing.
+            Sentences that feel like his, but not entirely.
+        </br>At the same time, perception begins to slip.</br>
+       Not dramatically.</br>
+            Subtly.</p>
+        <p class="text-box">A figure at the end of a corridor that seems present until he approaches and finds nothing.
+            A voice resembling a friend, heard briefly, without a clear origin.</p>
+        <p class="text-box">Reflections that appear slightly delayed, as if they follow rather than mirror.</br>
+            These are not events.</br>
+            They are discrepancies.</p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+
+        
+        
+    
+    </div>
+  </section>
+  <section class="page" id="page-5">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+    
+    <p class="text-box">In the west wing, he finds a notebook with his name embossed on the cover, placed in a room he
+        does not remember entering before.</p>
+    <p class="text-box">Inside:</p>
+    <p class="text-box">Day 25:</br>Subject displays perceptual doubling.</p>
+    <p class="text-box">It is Day 22.</p> 
+    <p class="text-box">He turns the pages.</br>
+        The handwriting resembles his own.</p>
+    <p class="text-box">Only steadier, more detached, as if written by someone observing him from a position without
+        emotion or urgency.</p>
+    <p class="text-box">He does not remember writing any of it.
+        The authority of the psychologist that accompanied him on the train begins dissolving, not only
+        through absence, but through uncertainty.</p>
+        <p class="text-box">Was the psychologist external?</br>
+            Or part of the same system he is now inside?</p>
+        <p class="text-box">The castle no longer feels supervised.</br>
+            It feels self-sustaining.</br>
+            He checks the gravel outside for signs of movement.</br> None.</p>
+        <p class="text-box">He checks the phone line.</br>
+        Disconnected.</p>
+        <p class="text-box">He searches for traces of the clinic in Paris.</br>
+        No record.</p>
+         <p class="text-box"></p>
+         <p class="text-box"></p>
+         <p class="text-box"></p>
+         <p class="text-box"></p>
+         <p class="text-box"></p>
+         <p class="text-box"></p>
+    
+          
+            
+    </div>
+  </section>
+  <section class="page" id="page-6">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+
+        <p class="text-box">The structure remains.
+            The observer does not.</p>
+        <p class="text-box">He walks to the church again, drawn by the regularity of the bell, by the idea that something
+            outside the castle might still function independently of him.</p>
+        <p class="text-box">He sits beneath the vertical architecture, waiting.</p>
+        <p class="text-box">The voice disperses into space.</br> It does not reach him in the way he expects.</p>
+        <p class="text-box">Nothing transfers.</p>
+        <p class="text-box">He realizes something slowly, almost reluctantly.</p>
+        <p class="text-box">In Paris, perception was unstable, but it was shared. It was shaped by others, interrupted,
+            corrected, constantly negotiated.
+            </p>
+        <p class="text-box">Here, it is closed.
+            There is no interruption.</br>
+            No counterweight.</br>
+            No external gaze to break the loop.</p>
+            <p class="text-box">The castle does not introduce hallucination as something new.</p>
+        <p class="text-box">It amplifies awareness until awareness bends back onto itself.</p>
+            <p class="text-box">Corridors feel longer in the evening, not because they change, but because his sense of duration
+                stretches within them. </br>Reflections lag by a fraction, barely noticeable, but enough to disturb
+                alignment. Sound detaches slightly from its source, arriving too early or too late, creating a gap
+                that cannot be resolved.</p>
+
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            
+       
+       
+       
+        
+        
+       
+    </div>
+  </section>
+  <section class="page" id="page-7">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+        <p class="text-box">Perception is no longer orienting.</br> It is generating.</p>
+            <p class="text-box">The observer and the observed collapse into the same position.
+            </br>There is no supervising authority.</p>
+             <p class="text-box">The experiment continues.</p>
+             <p class="text-box">One day, he ascends the donjon tower of the castle.</p>
+        <p class="text-box">The staircase spirals inward, tightening as it rises, compressing movement into repetition.
+            At the highest point, the structure opens.</p>
+        <p class="text-box">Wind surrounds him, It is black outside,There is no guardrail.</p>
+        <p class="text-box">The horizon expands in every direction, uninterrupted, without reference points.</br>
+            For a moment, everything appears stable.</p>
+        <p class="text-box">Then something shifts.</p>
+        <p class="text-box">At the edge of his vision, a movement.</p>
+        <p class="text-box">He turns.</br>
+        Nothing.</p>
+    <p class="text-box">But the sensation remains, not outside, but just behind him, delayed, as if something follows a
+        fraction of a second too late.</p>
+        <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+            <p class="text-box"></p>
+    </div>
+  </section>
+  
+</section>
+<section class="page" id="page-8">
+  <div class="page__bg"></div>
+  <div class="page__fade"></div>
+  <div class="page__label">
+      <p class="text-box">He steps forward.It follows.</p>
+      <p class="text-box">Not a figure fully seen, but a distortion, a density in space, a presence that does not belong to the
+          world but does not detach from it either.</p>
+      <p class="text-box">He begins to understand.</br>
+          Not as a thought, but as a pressure.</p>
+      <p class="text-box">It moves as he moves.</br>
+          It stops as he stops.</p>
+      <p class="text-box">Closer now.</br>
+          Too close.</p>
+      <p class="text-box">He turns again, faster.
+          And for a brief instant, he sees it.
+          Not a monster,
+          but a face.</p>
+          <p class="text-box">His face, misaligned, lagging, arriving too late to be him, yet too precise to be anything else.
+              The second Tristan.</br>No longer above him, but behind him, advancing.</p>
+          <p class="text-box">The bell rings, precise.</p>
+          <p class="text-box">The presence advances.
+              There is no space left to correct, no distance left to re-align.</br>Only the edge.
+              Only the final misalignment.</p>
+          <p class="text-box">He moves to escape it,
+              or to escape himself.</br>His foot slips.</br>The body disappears into the open.</p>
+           <p class="text-box">Silence follows.</p>
+           <p class="text-box"></p>
+           <p class="text-box"></p>
+           <p class="text-box"></p>
+           <p class="text-box"></p>
+            <p class="text-box"></p>
+  </div>
+</section>
+
+  <script>
+    const pages  = document.querySelectorAll('.page');
+    const labels = document.querySelectorAll('.page__label');
+    const dots   = document.querySelectorAll('.dot');
+    const bar    = document.getElementById('progress');
+
+    // ── IntersectionObserver: reveal label when page enters viewport ──
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const idx = [...pages].indexOf(entry.target);
+        const label = labels[idx];
+        if (entry.isIntersecting) {
+          label.classList.add('visible');
+          dots.forEach(d => d.classList.remove('active'));
+          if (dots[idx]) dots[idx].classList.add('active');
+        } else {
+          label.classList.remove('visible');
+        }
+      });
+    }, { threshold: 0.5 });
+
+    pages.forEach(p => observer.observe(p));
+
+    // ── Scroll progress bar ──
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // ── Dot navigation ──
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        const idx = parseInt(dot.dataset.idx);
+        pages[idx].scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>

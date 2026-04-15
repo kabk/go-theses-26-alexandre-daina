@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scrolling Gallery</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Eagle+Lake&family=Lancelot&display=swap" rel="stylesheet">
+<style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: #0a0a0a;
+      font-family: 'Josefin Sans', sans-serif;
+    }
+
+    /* ── Each section fills the viewport ── */
+    .page {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Background image ── */
+    .page__bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transform: scale(1.03); /* tiny scale prevents white edge flash */
+      transition: transform 0.6s ease;
+      filter: blur(1px) brightness(0.6);
+    }
+
+    /* ── Top & bottom opacity fade using a gradient overlay ── */
+    .page__fade {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255, 0.75) 0%,
+        rgba(255,255,255, 0.10) 22%,
+        rgba(255,255,255, 0.00) 38%,
+        rgba(255,255,255, 0.00) 62%,
+        rgba(255,255,255, 0.10) 78%,
+        rgba(255,255,255, 0.75) 100%
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Text label ── */
+    .page__label {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      color:yellow;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .page__label.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .title_box {
+      
+font-family: "Lancelot", serif;
+font-weight: bold;
+font-style: normal;
+      font-size: clamp(4.5rem, 10vw, 9rem);
+      font-weight: 100;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: #870000c2;
+      text-shadow: 0 2px 40px rgba(255, 9, 9, 0.852);
+      width: 50vw;  
+      -webkit-text-stroke: 1px rgb(255, 170, 0);
+    }
+
+    .page__word {
+      font-family: 'Josefin Sans', sans-serif;
+      font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+      font-weight: 100;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* ── Thin rule decorations ── */
+    .page__rule {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      margin-top: 0.4rem;
+    }
+
+    .page__rule span {
+      display: block;
+      width: 40px;
+      height: 1px;
+      background: rgba(255,255,255,0.45);
+    }
+
+    .page__rule em {
+      font-style: normal;
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+    }
+
+    /* ── Scroll hint on first page only ── */
+    .scroll-hint {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgb(255, 170, 0);
+      font-size: 0.6rem;
+      font-family: 'Times New Roman', Times, serif;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    .scroll-hint svg {
+      width: 18px;
+      opacity: 0.5;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%       { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* ── Slim progress bar ── */
+    #progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: rgba(255,255,255,0.6);
+      width: 0%;
+      z-index: 100;
+      transition: width 0.1s linear;
+    }
+
+    /* ── Page indicator dots ── */
+    #dots {
+      position: fixed;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #870000c2;
+      border: 1px solid rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: background 0.3s, transform 0.3s;
+    }
+
+    .dot.active {
+      background: rgb(255, 170, 0);
+      transform: scale(1.4);
+    }
+
+    div.corner-top-left{
+  position:fixed;
+  top:0;
+  left:0;
+  height: 10%;
+  width: 10%;
+  z-index: 7;
+}
+
+div.corner-bottom-right{
+  position: fixed;
+  bottom: 90vh;
+  right: 90vw;
+
+  height: 10%;
+  width: 10%;
+  z-index: 7;
+}
+
+.frame{
+  height: 1000%;
+  width: 1000%;
+}
+
+.text-box{
+    padding: 5px;
+    width: 50vw;
+    font-family: 'Times New Roman', Times, serif;
+    text-align: center;
+    justify-content: center;
+    text-shadow: 0 0 10px rgba(255, 230, 100, 0.6);
+}
+
+    /* ── Image sources (local folder) ── */
+    #page-0 .page__bg { background-image: url('content/metro.jpg'); }
+    #page-1 .page__bg { background-image: url('content/tunnel.jpg'); }
+    #page-2 .page__bg { background-image: url('content/def.jpg'); }
+    #page-3 .page__bg { background-image: url('content/hopital.jpg'); }
+    #page-4 .page__bg { background-image: url('content/piano.jpg'); }
+    #page-5 .page__bg { background-image: url('content/crazy.jpg'); }
+
+    @media (max-width: 768px) {
+      .text-box {
+        width: 90vw; /* Much wider on mobile for readability */
+      }
+      .title_box {
+        width: 90vw; /* Keeps the title correctly proportioned on small screens too */
+      }
+    } 
+
+    .back-btn {
+      position: absolute;
+      top: 2rem;
+      right: 2rem;
+      z-index: 10;
+      padding: 0.6rem 1.2rem;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(111, 4, 4, 0.8);
+      color: rgba(111, 4, 4, 0.8);
+      text-decoration: none;
+      font-size: 0.75rem;
+      font-family: 'Times New Roman', Times, serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: background 0.3s ease, color 0.3s ease;
+      border-radius: 4px;
+    }
+
+    .back-btn:hover {
+      background: rgb(255, 170, 0);
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <nav id="dots">
+    <div class="dot active" data-idx="0"></div>
+    <div class="dot" data-idx="1"></div>
+    <div class="dot" data-idx="2"></div>
+    <div class="dot" data-idx="3"></div>
+    <div class="dot" data-idx="4"></div>
+    <div class="dot" data-idx="5"></div>
+  </nav>
+
+  <div class="corner-top-left">
+    <img class="frame" src="content/frame2.png" >
+</div>
+
+<div class="corner-bottom-right">
+    <img class="frame" src="content/frame.png">
+</div>
+  
+  <section class="page" id="page-0">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <a href="menu.html" class="back-btn">Menu</a>
+    <div class="page__label">
+      <p class="title_box">The Weight of Being Seen    </p>
+    </div>
+    <div class="scroll-hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 5v14M5 12l7 7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Scroll
+    </div>
+  </section>
+
+  <section class="page" id="page-1">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+      <p class="text-box">Paris is not loud in the way people describe it.<br>
+        It is dense, not with sound, but with presence, with bodies, with surfaces that return you to yourself whether you want it or not.</p>
+        
+        <p class="text-box">It is not the noise that exhausts Tristan.<br>
+        It is awareness.</p>
+        
+        <p class="text-box">Cafés hum with conversation, but what unsettles him is not the sound, it is the invisible geometry of perception, the way every room seems already structured before he enters it, as if positions have been assigned in advance and he must immediately locate himself within them.</p>
+        
+        <p class="text-box">Not attacked.<br>
+        But placed.</p>
+        
+        <p class="text-box">He becomes conscious of posture before posture happens, of tone before speech occurs, of the way his hands rest on a table even before they settle, as if every gesture arrives already observed.</p>
+        <p class="text-box"></p>
+        <p class="text-box"></p>
+        <p class="text-box"></p>
+    </div>
+    
+  </section>
+
+  <section class="page" id="page-2">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+      <p class="text-box"><p class="text-box">He becomes conscious of posture before posture happens, of tone before speech occurs, of the way his hands rest on a table even before they settle, as if every gesture arrives already observed.</p>
+          
+      <p class="text-box">There is always a second Tristan, slightly above the first, following him.<br>
+      The first one lives.<br>
+      The second evaluates.</p>
+      
+      <p class="text-box">In meetings, he anticipates judgment before it arrives, adjusting himself in advance, correcting sentences before they are spoken, rehearsing tone as it unfolds.</p>
+      
+      <p class="text-box">He edits internally while speaking.<br>
+      He replays every exchange afterward.</p>
+      
+      <p class="text-box">He does not fear humiliation.<br>
+      He fears misalignment, the moment where something in him does not correspond to the space he is in, where a small shift breaks the coherence of the scene.</p>
+      <p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+     
+    </div>
+  </section>
+
+  <section class="page" id="page-3">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+      <p class="text-box">There is always a second Tristan, slightly above the first, following him.<br>
+        The first one lives.<br>
+        The second evaluates.</p>
+        
+        <p class="text-box">In meetings, he anticipates judgment before it arrives, adjusting himself in advance, correcting sentences before they are spoken, rehearsing tone as it unfolds.</p>
+        
+        <p class="text-box">He edits internally while speaking.<br>
+        He replays every exchange afterward.</p>
+        
+        <p class="text-box">He does not fear humiliation.<br>
+        He fears misalignment, the moment where something in him does not correspond to the space he is in, where a small shift breaks the coherence of the scene.</p>
+        
+        <p class="text-box">Misalignment is subtle.<br>
+        A pause that lasts a second too long.<br>
+        A tone that lands slightly off.<br>
+        A gesture that communicates something unintended.</p>
+        <p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+        
+        
+    </div>
+  </section>
+
+  <section class="page" id="page-4">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+      <p class="text-box">Hyper-awareness masquerades as responsibility.</p>
+
+<p class="text-box">He calls it discipline, arriving prepared, anticipating reactions, correcting himself before mistakes occur. The psychologist calls it overstimulation, a system pushed beyond what it can sustain.</p>
+
+<p class="text-box">But what Tristan struggles to admit, even to himself, is that awareness feels seductive.</p>
+
+<p class="text-box">To anticipate becomes a form of control.<br>
+To analyse becomes a form of mastery.<br>
+To remain alert becomes a way of never being caught off guard.</p>
+
+<p class="text-box">At first, it feels like precision.</p>
+
+<p class="text-box">He notices things others seem to miss: a micro-shift in a colleague’s expression, a hesitation in someone’s voice, a subtle shift in atmosphere just before a conversation turns.</p>
+
+<p class="text-box">This sensitivity feels useful.<br>
+Like an advantage.</p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+        
+    </div>
+  </section>
+
+  <section class="page" id="page-5">
+    <div class="page__bg"></div>
+    <div class="page__fade"></div>
+    <div class="page__label">
+      <p class="text-box">But gradually, the system begins turning inward.</p>
+
+<p class="text-box">Observation becomes surveillance, and the voice that evaluates no longer belongs to the outside world but to him.</p>
+
+<p class="text-box">Every action is accompanied by commentary.<br>
+Every moment is reviewed before it finishes occurring.</p>
+
+<p class="text-box">Clarity becomes suffocation.</p>
+
+<p class="text-box">In the evenings, alone in his apartment, silence does not calm him. It sharpens him. The day replays in fragments, micro-expressions, tonal shifts, perceived mistakes, looping without resolution.</p>
+
+<p class="text-box">The mind edits. Replays. Annotates. Corrects.</p>
+
+<p class="text-box">The city does not create the anxiety.<br>
+It reveals it.</p>
+
+<p class="text-box">When the psychologist proposes temporary withdrawal, the suggestion feels logical.</p>
+
+<p class="text-box">Distance. Reduced stimuli. Architectural containment.</p>
+
+<p class="text-box">A 17th-century castle in the countryside, with thick walls, controlled routines, and continuous observation through scheduled sessions and written reports meant to stabilise his condition.</p>
+
+<p class="text-box">The idea is simple: remove the density of social interaction and observe what remains.</p>
+
+<p class="text-box">Tristan agrees not because he wants to escape others.<br>
+He wants to escape himself watching himself.</p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+<p class="text-box"></p>
+    </div>
+  </section>
+
+
+
+  <script>
+    const pages  = document.querySelectorAll('.page');
+    const labels = document.querySelectorAll('.page__label');
+    const dots   = document.querySelectorAll('.dot');
+    const bar    = document.getElementById('progress');
+
+    // ── IntersectionObserver: reveal label when page enters viewport ──
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const idx = [...pages].indexOf(entry.target);
+        const label = labels[idx];
+        if (entry.isIntersecting) {
+          label.classList.add('visible');
+          dots.forEach(d => d.classList.remove('active'));
+          if (dots[idx]) dots[idx].classList.add('active');
+        } else {
+          label.classList.remove('visible');
+        }
+      });
+    }, { threshold: 0.5 });
+
+    pages.forEach(p => observer.observe(p));
+
+    // ── Scroll progress bar ──
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // ── Dot navigation ──
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        const idx = parseInt(dot.dataset.idx);
+        pages[idx].scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>
